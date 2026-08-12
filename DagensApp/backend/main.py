@@ -7,6 +7,7 @@ from google.genai import types
 from pydantic import BaseModel, ConfigDict, Field
 
 from prompt import SYSTEM_PROMPT
+from references import GLAZE_REFERENCES
 
 load_dotenv()
 
@@ -21,8 +22,22 @@ client = genai.Client(api_key=api_key)
 
 app = FastAPI(
     title="Dagens tall API",
-    description="Lager anonymiserte Teams-maler via Gemini.",
+    description="Lager Teams-maler via Gemini uten å sende tall eller selgerdata.",
 )
+
+
+class Shoutout(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    slot: int = Field(ge=1, le=10)
+    note: str = Field(min_length=1, max_length=500)
+
+
+class NotableSale(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    slot: int = Field(ge=1, le=3)
+    note: str = Field(min_length=1, max_length=500)
 
 
 class GenerateReportRequest(BaseModel):
@@ -30,6 +45,8 @@ class GenerateReportRequest(BaseModel):
 
     resultLevel: int = Field(ge=1, le=5)
     glazeLevel: int = Field(ge=1, le=5)
+    shoutouts: list[Shoutout] = Field(default_factory=list, max_length=10)
+    notableSales: list[NotableSale] = Field(default_factory=list, max_length=3)
 
 
 class GenerateReportResponse(BaseModel):
@@ -44,14 +61,6 @@ RESULT_LEVELS = {
     5: "knust budsjettet",
 }
 
-GLAZE_LEVELS = {
-    1: "saklig",
-    2: "litt ekstra positiv",
-    3: "varm og anerkjennende",
-    4: "entusiastisk",
-    5: "full glaze",
-}
-
 
 @app.get("/api/health")
 def health_check():
@@ -64,17 +73,47 @@ def health_check():
 )
 def generate_daily_report(request: GenerateReportRequest):
     result = RESULT_LEVELS[request.resultLevel]
-    glaze = GLAZE_LEVELS[request.glazeLevel]
+    reference = GLAZE_REFERENCES[request.glazeLevel]
+
+    shoutout_context = "\n".join(
+        f"- [SHOUTOUT{shoutout.slot}_NAVN]: {shoutout.note}"
+        for shoutout in request.shoutouts
+    )
+
+    if not shoutout_context:
+        shoutout_context = "Ingen shoutouts i dag."
+
+    notable_sales_context = "\n".join(
+        f"- [S{sale.slot}]: {sale.note}"
+        for sale in request.notableSales
+    )
+
+    if not notable_sales_context:
+        notable_sales_context = "Ingen merkverdige salg i dag."
 
     user_prompt = f"""
-Lag en Teams-klar dagsrapportmal.
+Lag en Teams-klar dagsrapportmal på bokmål.
 
 Resultatstemning: {result}
-Glaze-nivå: {glaze}
+
+Skrivestilreferanse:
+{reference}
+
+Shoutouts som skal integreres naturlig i teksten:
+{shoutout_context}
+
+Merkverdige salg som skal integreres naturlig i teksten:
+{notable_sales_context}
 
 Viktig:
-- Du har ikke tilgang til faktiske tall, navn eller salg.
-- Bruk bare de tillatte plassholderne fra systeminstruksjonen.
+- Du har ikke tilgang til faktiske tall eller navn.
+- Bruk plassholderne fra systeminstruksjonen for budsjett, inntjening,
+  avvik og toppselgere.
+- Integrer hvert shoutout-notat naturlig, men bruk den angitte [SHOUTOUT..._NAVN]-
+  plassholderen for navnet.
+- Integrer hvert salgsnotat naturlig, men bruk den angitte [S1], [S2] eller [S3]-
+  plassholderen for selgernavnet.
+- Bruk bare notatene og plassholderne som er gitt over.
 - Returner bare selve tekstmalen, uten forklaring eller kodeblokk.
 """
 

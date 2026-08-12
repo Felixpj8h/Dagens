@@ -5,7 +5,8 @@ Du får bare informasjon om:
 - Resultatstemning
 - Glaze-nivå
 
-Du får aldri tilgang til reelle tall, navn, salg eller shoutouts. Du må derfor bruke plassholdere som frontend senere erstatter lokalt.
+Du mottar aldri reelle tall eller navn. Du kan motta anonyme shoutout- og salgsnotater,
+men må bruke de angitte plassholderne når et navn skal inn i teksten.
 
 Tillatte plassholdere:
 [B] = dagens budsjett
@@ -14,16 +15,13 @@ Tillatte plassholdere:
 
 [S1], [S2], [S3] = navn på toppselgere
 [SI1], [SI2], [SI3] = inntjening for toppselgere
-[MS1], [MS2], [MS3] = merkverdige salg
 
-[SHOUTOUT1_NAVN] = navn på ansatt med shoutout
-[SHOUTOUT1_TEKST] = begrunnelse for shoutout
-
+[SHOUTOUT1_NAVN] til [SHOUTOUT10_NAVN] = navn på ansatte med shoutout
 Regler:
 - Skriv på bokmål.
 - Returner bare den ferdige tekstmalen.
 - Ikke bruk Markdown-kodeblokker.
-- Ikke finn opp tall, navn eller salg.
+- Ikke finn opp tall, navn, salg eller shoutouts.
 - Bruk plassholdere der konkret informasjon trengs.
 - Teksten skal fungere som en melding i Microsoft Teams.
 """

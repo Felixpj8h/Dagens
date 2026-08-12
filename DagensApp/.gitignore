@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python-backend: hemmeligheter og lokalt virtuelt miljø
+backend/.env
+backend/.venv/
