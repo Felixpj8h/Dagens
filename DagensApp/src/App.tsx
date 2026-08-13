@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 type Seller = { name: string; earnings: string; notableSale: string }
@@ -18,6 +18,8 @@ type FormState = {
 
 const storageKey = 'dagens-tall-form'
 const newId = () => crypto.randomUUID()
+const apiBaseUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
 const defaultState: FormState = {
   budget: '',
@@ -84,9 +86,61 @@ const money = new Intl.NumberFormat('nb-NO', {
 
 function App() {
   const [form, setForm] = useState<FormState>(readStoredState)
+  const [idToken, setIdToken] = useState('')
+  const [authError, setAuthError] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [copyStatus, setCopyStatus] = useState('')
+  const googleButtonRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (idToken) return
+
+    if (!googleClientId) {
+      setAuthError('Google-innlogging er ikke konfigurert. Legg inn VITE_GOOGLE_CLIENT_ID.')
+      return
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[src="https://accounts.google.com/gsi/client"]',
+    )
+    const script = existingScript ?? document.createElement('script')
+
+    const initializeGoogleLogin = () => {
+      if (!window.google || !googleButtonRef.current) return
+
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (response) => {
+          setIdToken(response.credential)
+          setAuthError('')
+        },
+      })
+
+      googleButtonRef.current.replaceChildren()
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        text: 'signin_with',
+      })
+    }
+
+    script.addEventListener('load', initializeGoogleLogin)
+    script.addEventListener('error', () => setAuthError('Kunne ikke laste Google-innlogging. Sjekk internettforbindelsen.'))
+
+    if (!existingScript) {
+      script.src = 'https://accounts.google.com/gsi/client'
+      script.async = true
+      script.defer = true
+      document.head.appendChild(script)
+    } else if (window.google) {
+      initializeGoogleLogin()
+    }
+
+    return () => {
+      script.removeEventListener('load', initializeGoogleLogin)
+    }
+  }, [idToken])
 
   useEffect(() => {
     sessionStorage.setItem(storageKey, JSON.stringify(form))
@@ -245,9 +299,12 @@ function App() {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/generate-daily-report', {
+      const response = await fetch(`${apiBaseUrl}/api/generate-daily-report`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           resultLevel: form.resultLevel,
           glazeLevel: form.glazeLevel,
@@ -294,6 +351,9 @@ function App() {
 
       update({ draft: replaceTokens(data.template) })
     } catch (caught) {
+      if (caught instanceof Error && /logg inn|Google-innlogging/i.test(caught.message)) {
+        setIdToken('')
+      }
       setError(
         caught instanceof Error
           ? caught.message
@@ -315,6 +375,13 @@ function App() {
     }
   }
 
+  function signOut() {
+    window.google?.accounts.id.disableAutoSelect()
+    setIdToken('')
+    setError('')
+    setCopyStatus('')
+  }
+
   const deviationText = !hasNumbers
     ? 'Legg inn tall for å se avvik'
     : difference === 0
@@ -325,6 +392,20 @@ function App() {
           maximumFractionDigits: 1,
         })} % ${difference > 0 ? 'over' : 'under'}`
 
+  if (!idToken) {
+    return (
+      <main className="login-shell">
+        <section className="login-card" aria-labelledby="login-title">
+          <p className="eyebrow">DAGSRAPPORT</p>
+          <h1 id="login-title">Dagens tall</h1>
+          <p>Logg inn med din godkjente Google-konto for å åpne rapportverktøyet.</p>
+          <div className="google-button" ref={googleButtonRef} />
+          {authError && <p className="message error" role="alert">{authError}</p>}
+        </section>
+      </main>
+    )
+  }
+
   return (
     <main className="app-shell">
       <header className="page-header">
@@ -334,9 +415,12 @@ function App() {
           <p>Lag et Teams-klart utkast. Tall og selgerdata holdes lokalt.</p>
         </div>
 
-        <div className="privacy-badge">
-          <span aria-hidden="true">✦</span>
-          Tall og selgerdata blir på din enhet
+        <div className="header-actions">
+          <div className="privacy-badge">
+            <span aria-hidden="true">✦</span>
+            Tall og selgerdata blir på din enhet
+          </div>
+          <button className="sign-out-button" type="button" onClick={signOut}>Logg ut</button>
         </div>
       </header>
 
