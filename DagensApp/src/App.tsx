@@ -9,6 +9,8 @@ type FormState = {
   earnings: string
   sellers: Seller[]
   shoutouts: Shoutout[]
+  asoComment: string
+  npsScore: string
   glazeLevel: number
   resultLevel: number
   draft: string
@@ -26,6 +28,8 @@ const defaultState: FormState = {
     notableSale: '',
   })),
   shoutouts: [],
+  asoComment: '',
+  npsScore: '',
   glazeLevel: 3,
   resultLevel: 3,
   draft: '',
@@ -152,6 +156,14 @@ function App() {
       }
     })
 
+    if (form.asoComment.trim()) {
+      values.ASO = form.asoComment.trim()
+    }
+
+    if (form.npsScore.trim()) {
+      values.NPS = form.npsScore.trim()
+    }
+
     return values
   }, [budget, difference, earnings, form, hasNumbers, percentage])
 
@@ -203,6 +215,13 @@ function App() {
       return 'Hver shoutout må ha både navn og begrunnelse.'
     }
 
+    if (form.npsScore.trim()) {
+      const npsScore = Number(form.npsScore)
+      if (!Number.isInteger(npsScore) || npsScore < 0 || npsScore > 100) {
+        return 'NPS må være et helt tall fra 0 til 100.'
+      }
+    }
+
     return ''
   }
 
@@ -244,11 +263,22 @@ function App() {
               slot: index + 1,
               note: seller.notableSale.trim(),
             })),
+          asoComment: form.asoComment.trim() || null,
+          npsScore: form.npsScore.trim() ? Number(form.npsScore) : null,
         }),
       })
 
       if (!response.ok) {
-        throw new Error('Kunne ikke lage utkastet akkurat nå.')
+        const errorData: unknown = await response.json().catch(() => null)
+        const message =
+          errorData &&
+          typeof errorData === 'object' &&
+          'detail' in errorData &&
+          typeof errorData.detail === 'string'
+            ? errorData.detail
+            : 'Kunne ikke lage utkastet akkurat nå.'
+
+        throw new Error(message)
       }
 
       const data: unknown = await response.json()
@@ -476,9 +506,47 @@ function App() {
         )}
       </section>
 
+      <section className="panel aso-nps-panel" aria-labelledby="aso-nps-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">04 · KUNDE OG SUPPORT</p>
+            <h2 id="aso-nps-title">ASO og NPS</h2>
+          </div>
+          <span className="muted">Valgfritt · sendes til AI</span>
+        </div>
+
+        <div className="field-grid two-columns">
+          <label>
+            ASO-kommentar
+            <textarea
+              rows={3}
+              value={form.asoComment}
+              onChange={(event) => update({ asoComment: event.target.value })}
+              placeholder="F.eks. solid flyt i kassen og god hjelp i supportdisken"
+            />
+            <small>Kommentar til After Sales Operations – kasse og support.</small>
+          </label>
+
+          <label>
+            NPS-score
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              inputMode="numeric"
+              value={form.npsScore}
+              onChange={(event) => update({ npsScore: event.target.value })}
+              placeholder="0–100"
+            />
+            <small>Kundeopplevelse. 80 eller høyere regnes som bra.</small>
+          </label>
+        </div>
+      </section>
+
       <section className="panel sliders-panel" aria-labelledby="tone-title">
         <div>
-          <p className="eyebrow">04 · TONE</p>
+          <p className="eyebrow">05 · TONE</p>
           <h2 id="tone-title">Hvordan skal rapporten føles?</h2>
         </div>
 
@@ -527,8 +595,8 @@ function App() {
         <div>
           <h2>Klar for Teams?</h2>
           <p>
-            Resultatnivå, glaze-nivå og anonyme notater går til backend.
-            Tall og alle navn blir værende lokalt.
+            Resultatnivå, glaze-nivå, ASO, NPS og anonyme notater går til backend.
+            Tall, navn og selgerinntekt blir værende lokalt.
           </p>
         </div>
 

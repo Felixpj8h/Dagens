@@ -47,6 +47,8 @@ class GenerateReportRequest(BaseModel):
     glazeLevel: int = Field(ge=1, le=5)
     shoutouts: list[Shoutout] = Field(default_factory=list, max_length=10)
     notableSales: list[NotableSale] = Field(default_factory=list, max_length=3)
+    asoComment: str | None = Field(default=None, max_length=1000)
+    npsScore: int | None = Field(default=None, ge=0, le=100)
 
 
 class GenerateReportResponse(BaseModel):
@@ -91,8 +93,11 @@ def generate_daily_report(request: GenerateReportRequest):
     if not notable_sales_context:
         notable_sales_context = "Ingen merkverdige salg i dag."
 
+    aso_context = request.asoComment or "Ingen ASO-kommentar i dag."
+    nps_context = str(request.npsScore) if request.npsScore is not None else "Ingen NPS-score i dag."
+
     user_prompt = f"""
-Lag en Teams-klar dagsrapportmal på bokmål.
+Lag en Teams-klar dagsrapportmal for en norsk elektronikk kjede på bokmål.
 
 Resultatstemning: {result}
 
@@ -105,6 +110,12 @@ Shoutouts som skal integreres naturlig i teksten:
 Merkverdige salg som skal integreres naturlig i teksten:
 {notable_sales_context}
 
+ASO-kommentar:
+{aso_context}
+
+NPS-score:
+{nps_context}
+
 Viktig:
 - Du har ikke tilgang til faktiske tall eller navn.
 - Bruk plassholderne fra systeminstruksjonen for budsjett, inntjening,
@@ -113,8 +124,19 @@ Viktig:
   plassholderen for navnet.
 - Integrer hvert salgsnotat naturlig, men bruk den angitte [S1], [S2] eller [S3]-
   plassholderen for selgernavnet.
+- ASO betyr After Sales Operations: laget som jobber i kassen og supportdisken.
+- NPS er kundeopplevelsesscore fra 0 til 100; 80 eller høyere er bra.
+- Integrer ASO-kommentaren og NPS-scoren naturlig når de er oppgitt. Bruk direkte tekst
+  og tall, ikke [ASO] eller [NPS]-plassholdere.
+- Ikke nevn ASO eller NPS når det står at informasjonen mangler.
 - Bruk bare notatene og plassholderne som er gitt over.
 - Returner bare selve tekstmalen, uten forklaring eller kodeblokk.
+- Helst ikke bruk ordet Avik.
+- Ikke bruk Mdash "–"
+- Forkortelser som du kan bli kjent med: GM (Margin) ASO (after sales Operations (Gjengen som jobber i kassen og i supportdisken)) WIN (winner produkter (god inntjening)) NPS (kundeopplevelses score), disse tregnes ikke å bli forklart.
+- Når ASO er lagt in som shoutout er det til hele laget, ikke bare en person.
+- Husk vær kreativ, ikke bare skriv om navnen på referansene. Gjerne kom på egene sammenligninere om det passer.
+- Ikke nevn ting som ikke er lagt inn.
 """
 
     try:
@@ -133,8 +155,27 @@ Viktig:
 
         return GenerateReportResponse(template=template)
 
-    except Exception:
+    except Exception as error:
+        error_text = str(error)
+
+        if "RESOURCE_EXHAUSTED" in error_text or "429" in error_text:
+            detail = (
+                "Gemini-kvoten er brukt opp akkurat nå. Vent litt før du prøver igjen, "
+                "eller sjekk kvoten og faktureringen i Google AI Studio."
+            )
+            status_code = 429
+        elif "API key" in error_text or "API_KEY" in error_text or "401" in error_text:
+            detail = "Gemini API-nøkkelen ble ikke godtatt. Kontroller GEMINI_API_KEY i backend/.env."
+            status_code = 502
+        elif "403" in error_text or "PERMISSION_DENIED" in error_text:
+            detail = "Gemini-kontoen mangler tilgang til modellen. Sjekk prosjekt, API-nøkkel og fakturering i Google AI Studio."
+            status_code = 502
+        else:
+            detail = "Gemini kunne ikke lage utkastet. Kontroller internettforbindelsen og prøv igjen."
+            status_code = 502
+
+        print(f"Gemini generation failed: {type(error).__name__}: {error}")
         raise HTTPException(
-            status_code=502,
-            detail="Kunne ikke generere en mal fra Gemini. Prøv igjen.",
-        )
+            status_code=status_code,
+            detail=detail,
+        ) from error

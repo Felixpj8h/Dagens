@@ -21,8 +21,6 @@ GLAZE_REFERENCES = {
     Nr 3 går i dag til selveste 
     [S3]. hover inn [SI3] i GM. Mannen gjør som alltid. For en dag, For en mann. Stor idrett
     
-    Nps ender i dag på 74. Var tidvis kø både i kassen og på gulvet, som kan forklare at vi er litt under der vi ønsker å være.
-    
     Alt i alt en vell gjennomført dag. Vill gi litt ekstra skryt til 
     [SHOUTOUT1_NAVN] som på slutten kommer med en hjelpende hånd til ASO, som gjør at vi kommer i mål med kalibrering av TV som skal sendes med posten.
     
