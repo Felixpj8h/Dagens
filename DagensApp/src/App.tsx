@@ -95,7 +95,7 @@ function App() {
   const [openSeller, setOpenSeller] = useState(0)
   const [showToneDialog, setShowToneDialog] = useState(false)
   const [showDraftDialog, setShowDraftDialog] = useState(false)
-  const [darkMode, setDarkMode] = useState(() => sessionStorage.getItem('dagens-tall-theme') === 'dark')
+  const [darkMode, setDarkMode] = useState(() => sessionStorage.getItem('dagens-tall-theme') !== 'light')
   const [idToken, setIdToken] = useState('')
   const [authError, setAuthError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -166,8 +166,20 @@ function App() {
       if (showToneDialog) setShowToneDialog(false)
       if (showDraftDialog) setShowDraftDialog(false)
     }
+
+    const closeOnBackdropClick = (event: MouseEvent) => {
+      if (loading || isTyping || !(event.target instanceof HTMLElement)) return
+      if (!event.target.classList.contains('modal-backdrop')) return
+      if (showToneDialog) setShowToneDialog(false)
+      if (showDraftDialog) setShowDraftDialog(false)
+    }
+
     window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
+    window.addEventListener('mousedown', closeOnBackdropClick)
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape)
+      window.removeEventListener('mousedown', closeOnBackdropClick)
+    }
   }, [showToneDialog, showDraftDialog, loading, isTyping])
 
   useEffect(() => {
@@ -185,6 +197,10 @@ function App() {
   const percentage = hasNumbers && budget !== 0 ? (difference / budget) * 100 : 0
   const completedSellerCount = form.sellers.filter((seller) => seller.name.trim() && seller.earnings !== '' && Number.isFinite(toNumber(seller.earnings))).length
   const sellersComplete = completedSellerCount === 3
+
+  useEffect(() => {
+    document.documentElement.dataset.result = hasNumbers && difference < 0 ? 'under-budget' : 'at-budget'
+  }, [hasNumbers, difference])
 
   const tokens = useMemo(() => {
     const values: Record<string, string> = {}
@@ -349,7 +365,7 @@ function App() {
 
   return (
     <main className={`app-shell ${hasNumbers && difference < 0 ? 'under-budget' : 'at-budget'} ${darkMode ? 'dark-mode' : ''}`}>
-      <header className="page-header"><div><p className="eyebrow">DAGSRAPPORT</p><h1>Dagens tall</h1><p>Fyll ut litt om gangen – alt lagres i denne nettleserøkten.</p></div><div className="header-actions"><label className="theme-switch"><input type="checkbox" checked={darkMode} onChange={(event) => setDarkMode(event.target.checked)} /><span aria-hidden="true" /><strong>Mørk modus</strong></label><button className="sign-out-button" type="button" onClick={signOut}>Logg ut</button></div></header>
+      <header className="page-header"><div><p className="eyebrow">DAGSRAPPORT</p><h1>Dagens tall</h1><p>Fyll ut litt om gangen – alt lagres i denne nettleserøkten.</p></div><div className="header-actions"><label className="theme-switch"><input type="checkbox" checked={darkMode} onChange={(event) => setDarkMode(event.target.checked)} /><span aria-hidden="true" /><strong>Mørk modus</strong></label>{form.draft && <button className="draft-shortcut" type="button" onClick={() => setShowDraftDialog(true)}>Åpne utkast</button>}<button className="sign-out-button" type="button" onClick={signOut}>Logg ut</button></div></header>
 
       <nav className="progress-nav" aria-label="Steg i dagsrapporten">
         {steps.map((step) => <button key={step.number} type="button" className={`progress-step ${activeStep === step.number ? 'active' : ''} ${activeStep > step.number ? 'complete' : ''}`} onClick={() => goToStep(step.number)} aria-current={activeStep === step.number ? 'step' : undefined}><span>{step.number}</span><strong>{step.label}</strong></button>)}
@@ -367,7 +383,7 @@ function App() {
 
       {steps.filter((step) => step.number > activeStep).map((step) => <button className="step-summary" type="button" key={step.number} onClick={() => goToStep(step.number)}><div><p className="eyebrow">{String(step.number).padStart(2, '0')} · {step.shortLabel.toUpperCase()}</p>{renderStepSummary(step.number)}</div><span className="summary-action">Endre <span aria-hidden="true">→</span></span></button>)}
 
-      <section className="generate-panel"><div><h2>Lag Teams-utkastet</h2><p>Velg tone og glaze i neste vindu før utkastet blir generert.</p></div><button className="generate-button" type="button" onClick={openToneDialog}>Generer dagens tall <span aria-hidden="true">→</span></button></section>
+      <section className="generate-panel"><div><h2>Lag Teams-utkastet</h2><p>Velg tone og glaze i neste vindu før utkastet blir generert.</p></div><div className="generate-actions">{form.draft && <button className="draft-shortcut on-panel" type="button" onClick={() => setShowDraftDialog(true)}>Åpne forrige utkast</button>}<button className="generate-button" type="button" onClick={openToneDialog}>Generer dagens tall <span aria-hidden="true">→</span></button></div></section>
       {error && <p className="message error" role="alert">{error}</p>}
 
       {showToneDialog && <div className="modal-backdrop" role="presentation"><section className="tone-dialog" role="dialog" aria-modal="true" aria-labelledby="tone-title" tabIndex={-1} ref={toneDialogRef}><button className="modal-close" type="button" onClick={() => setShowToneDialog(false)} aria-label="Lukk tonevindu">×</button><p className="eyebrow">SISTE STEG</p><h2 id="tone-title">Velg tonen på utkastet</h2><p className="section-intro">Tall og navn sendes ikke til AI. Dette styrer bare formuleringene.</p><label className="slider-field"><span><strong>Resultat</strong><output>{resultLabels[form.resultLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.resultLevel} onChange={(event) => update({ resultLevel: Number(event.target.value) })} /><small>Beskriver stemningen rundt dagens resultat.</small></label><label className="slider-field"><span><strong>Glaze</strong><output>{glazeLabels[form.glazeLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.glazeLevel} onChange={(event) => update({ glazeLevel: Number(event.target.value) })} /><small>Styrer hvor mye ekstra anerkjennelse AI-malen skal ha.</small></label><div className="modal-actions"><button className="text-button" type="button" onClick={() => setShowToneDialog(false)} disabled={loading}>Tilbake</button><button className="generate-button" type="button" onClick={generateDraft} disabled={loading}>{loading ? 'Lager utkast…' : 'Generer utkast'} <span aria-hidden="true">→</span></button></div></section></div>}
