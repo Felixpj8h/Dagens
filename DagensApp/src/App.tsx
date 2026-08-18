@@ -94,6 +94,8 @@ function App() {
   const [activeStep, setActiveStep] = useState<Step>(1)
   const [openSeller, setOpenSeller] = useState(0)
   const [showToneDialog, setShowToneDialog] = useState(false)
+  const [showDraftDialog, setShowDraftDialog] = useState(false)
+  const [darkMode, setDarkMode] = useState(() => sessionStorage.getItem('dagens-tall-theme') === 'dark')
   const [idToken, setIdToken] = useState('')
   const [authError, setAuthError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -102,6 +104,7 @@ function App() {
   const [copyStatus, setCopyStatus] = useState('')
   const googleButtonRef = useRef<HTMLDivElement>(null)
   const toneDialogRef = useRef<HTMLDivElement>(null)
+  const draftDialogRef = useRef<HTMLDivElement>(null)
   const draftRef = useRef<HTMLTextAreaElement>(null)
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -151,14 +154,21 @@ function App() {
   }, [form])
 
   useEffect(() => {
-    if (!showToneDialog) return
-    toneDialogRef.current?.focus()
+    sessionStorage.setItem('dagens-tall-theme', darkMode ? 'dark' : 'light')
+    document.documentElement.dataset.theme = darkMode ? 'dark' : 'light'
+  }, [darkMode])
+
+  useEffect(() => {
+    if (!showToneDialog && !showDraftDialog) return
+    ;(showToneDialog ? toneDialogRef : draftDialogRef).current?.focus()
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !loading) setShowToneDialog(false)
+      if (event.key !== 'Escape' || loading || isTyping) return
+      if (showToneDialog) setShowToneDialog(false)
+      if (showDraftDialog) setShowDraftDialog(false)
     }
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [showToneDialog, loading])
+  }, [showToneDialog, showDraftDialog, loading, isTyping])
 
   useEffect(() => {
     if (form.draft) draftRef.current?.focus()
@@ -240,10 +250,19 @@ function App() {
     setShowToneDialog(true)
   }
 
+  const finishSellers = () => {
+    if (!sellersComplete) {
+      setError('Fyll inn navn og gyldig inntjening for alle tre toppselgerne før du går videre.')
+      return
+    }
+    goToStep(3)
+  }
+
   const writeDraft = (draft: string) => {
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
 
     setIsTyping(true)
+    setShowDraftDialog(true)
     update({ draft: '' })
     let position = 0
 
@@ -329,8 +348,8 @@ function App() {
   }
 
   return (
-    <main className={`app-shell ${hasNumbers && difference < 0 ? 'under-budget' : 'at-budget'}`}>
-      <header className="page-header"><div><p className="eyebrow">DAGSRAPPORT</p><h1>Dagens tall</h1><p>Fyll ut litt om gangen – alt lagres i denne nettleserøkten.</p></div><div className="header-actions"><button className="sign-out-button" type="button" onClick={signOut}>Logg ut</button></div></header>
+    <main className={`app-shell ${hasNumbers && difference < 0 ? 'under-budget' : 'at-budget'} ${darkMode ? 'dark-mode' : ''}`}>
+      <header className="page-header"><div><p className="eyebrow">DAGSRAPPORT</p><h1>Dagens tall</h1><p>Fyll ut litt om gangen – alt lagres i denne nettleserøkten.</p></div><div className="header-actions"><label className="theme-switch"><input type="checkbox" checked={darkMode} onChange={(event) => setDarkMode(event.target.checked)} /><span aria-hidden="true" /><strong>Mørk modus</strong></label><button className="sign-out-button" type="button" onClick={signOut}>Logg ut</button></div></header>
 
       <nav className="progress-nav" aria-label="Steg i dagsrapporten">
         {steps.map((step) => <button key={step.number} type="button" className={`progress-step ${activeStep === step.number ? 'active' : ''} ${activeStep > step.number ? 'complete' : ''}`} onClick={() => goToStep(step.number)} aria-current={activeStep === step.number ? 'step' : undefined}><span>{step.number}</span><strong>{step.label}</strong></button>)}
@@ -340,7 +359,7 @@ function App() {
 
       {activeStep === 1 && <section className="panel focused-step" aria-labelledby="numbers-title"><div className="section-heading"><div><p className="eyebrow">01 · RESULTAT</p><h2 id="numbers-title">Hvordan gikk dagen?</h2><p className="section-intro">Start med dagens to tall. Avviket regnes ut automatisk.</p></div><div className={`deviation ${hasNumbers && difference >= 0 ? 'positive' : 'negative'}`}>{deviationText}</div></div><div className="field-grid two-columns"><label>Daglig budsjett<input autoFocus inputMode="decimal" value={form.budget} onChange={(event) => update({ budget: event.target.value })} placeholder="f.eks. 125 000" /></label><label>Dagens inntjening<input inputMode="decimal" value={form.earnings} onChange={(event) => update({ earnings: event.target.value })} placeholder="f.eks. 132 500" /></label></div><div className="step-actions"><button className="next-button" type="button" onClick={nextStep}>Videre til topp 3 <span aria-hidden="true">→</span></button></div></section>}
 
-      {activeStep === 2 && <section className="panel focused-step" aria-labelledby="sellers-title"><div className="section-heading"><div><p className="eyebrow">02 · TOPP 3</p><h2 id="sellers-title">Selgerne som leverte</h2><p className="section-intro">Fyll ut én selger om gangen. Merkverdige salg er helt valgfritt.</p></div><div className="seller-count">{completedSellerCount} / 3 ferdig</div></div><div className="seller-sequence">{form.sellers.map((seller, index) => { const isReady = seller.name.trim() && seller.earnings !== '' && Number.isFinite(toNumber(seller.earnings)); const isOpen = openSeller === index; const canOpen = index === 0 || Boolean(form.sellers[index - 1].name.trim() && form.sellers[index - 1].earnings !== ''); return <article className={`seller-card guided-seller ${isOpen ? 'open' : ''} ${isReady ? 'ready' : ''}`} key={index}>{!isOpen ? <button type="button" className="seller-preview" disabled={!canOpen} onClick={() => setOpenSeller(index)}><span className="rank">#{index + 1}</span><span><strong>{seller.name || `Topp ${index + 1}`}</strong><small>{isReady ? money.format(toNumber(seller.earnings)) : canOpen ? 'Trykk for å fylle ut' : 'Fyll ut forrige selger først'}</small></span><span aria-hidden="true">{isReady ? '✓' : '→'}</span></button> : <><div className="seller-card-heading"><span className="rank">#{index + 1}</span><span>Fyll ut toppselger {index + 1}</span></div><div className="field-grid two-columns"><label>Navn<input autoFocus={index === 0} value={seller.name} onChange={(event) => updateSeller(index, { name: event.target.value })} placeholder="Selgernavn" /></label><label>Inntjening<input inputMode="decimal" value={seller.earnings} onChange={(event) => updateSeller(index, { earnings: event.target.value })} onBlur={() => advanceSellerIfReady(index)} placeholder="0" /></label></div><details className="optional-details" open={Boolean(seller.notableSale)}><summary>+ Legg til merkverdig salg <span>valgfritt</span></summary><label>Hva var merkverdig?<textarea rows={3} value={seller.notableSale} onChange={(event) => updateSeller(index, { notableSale: event.target.value })} placeholder="Kort detalj til rapporten" /></label></details><div className="seller-card-actions"><button className="text-button" type="button" onClick={() => setOpenSeller(Math.max(0, index - 1))} disabled={index === 0}>Tilbake</button><button className="secondary-button" type="button" onClick={() => setOpenSeller(index < 2 ? index + 1 : index)}>{index < 2 ? 'Neste selger' : 'Ferdig med topp 3'}</button></div></>}</article>})}</div>{sellersComplete && <div className="seller-recap"><strong>Topp 3 er klart</strong><span>{form.sellers.map((seller, index) => `#${index + 1} ${seller.name}`).join(' · ')}</span></div>}<div className="step-actions"><button className="text-button" type="button" onClick={() => goToStep(1)}>← Til resultat</button><button className="next-button" type="button" onClick={nextStep}>Videre til ekstra innsats <span aria-hidden="true">→</span></button></div></section>}
+      {activeStep === 2 && <section className="panel focused-step" aria-labelledby="sellers-title"><div className="section-heading"><div><p className="eyebrow">02 · TOPP 3</p><h2 id="sellers-title">Selgerne som leverte</h2><p className="section-intro">Fyll ut én selger om gangen. Merkverdige salg er helt valgfritt.</p></div><div className="seller-count">{completedSellerCount} / 3 ferdig</div></div><div className="seller-sequence">{form.sellers.map((seller, index) => { const isReady = seller.name.trim() && seller.earnings !== '' && Number.isFinite(toNumber(seller.earnings)); const isOpen = openSeller === index; const canOpen = index === 0 || Boolean(form.sellers[index - 1].name.trim() && form.sellers[index - 1].earnings !== ''); return <article className={`seller-card guided-seller ${isOpen ? 'open' : ''} ${isReady ? 'ready' : ''}`} key={index}>{!isOpen ? <button type="button" className="seller-preview" disabled={!canOpen} onClick={() => setOpenSeller(index)}><span className="rank">#{index + 1}</span><span><strong>{seller.name || `Topp ${index + 1}`}</strong><small>{isReady ? money.format(toNumber(seller.earnings)) : canOpen ? 'Trykk for å fylle ut' : 'Fyll ut forrige selger først'}</small></span><span aria-hidden="true">{isReady ? '✓' : '→'}</span></button> : <><div className="seller-card-heading"><span className="rank">#{index + 1}</span><span>Fyll ut toppselger {index + 1}</span></div><div className="field-grid two-columns"><label>Navn<input autoFocus={index === 0} value={seller.name} onChange={(event) => updateSeller(index, { name: event.target.value })} placeholder="Selgernavn" /></label><label>Inntjening<input inputMode="decimal" value={seller.earnings} onChange={(event) => updateSeller(index, { earnings: event.target.value })} onBlur={() => advanceSellerIfReady(index)} placeholder="0" /></label></div><details className="optional-details" open={Boolean(seller.notableSale)}><summary>+ Legg til merkverdig salg <span>valgfritt</span></summary><label>Hva var merkverdig?<textarea rows={3} value={seller.notableSale} onChange={(event) => updateSeller(index, { notableSale: event.target.value })} placeholder="Kort detalj til rapporten" /></label></details><div className="seller-card-actions"><button className="text-button" type="button" onClick={() => setOpenSeller(Math.max(0, index - 1))} disabled={index === 0}>Tilbake</button><button className="secondary-button" type="button" onClick={() => index < 2 ? setOpenSeller(index + 1) : finishSellers()}>{index < 2 ? 'Neste selger' : 'Ferdig med topp 3'}</button></div></>}</article>})}</div>{sellersComplete && <div className="seller-recap"><strong>Topp 3 er klart</strong><span>{form.sellers.map((seller, index) => `#${index + 1} ${seller.name}`).join(' · ')}</span></div>}<div className="step-actions"><button className="text-button" type="button" onClick={() => goToStep(1)}>← Til resultat</button><button className="next-button" type="button" onClick={finishSellers}>Videre til ekstra innsats <span aria-hidden="true">→</span></button></div></section>}
 
       {activeStep === 3 && <section className="panel focused-step" aria-labelledby="shoutout-title"><div className="section-heading"><div><p className="eyebrow">03 · EKSTRA INNSATS</p><h2 id="shoutout-title">Shoutouts</h2><p className="section-intro">Dette er valgfritt. Gi noen en ekstra anerkjennelse når det passer.</p></div><button className="secondary-button" type="button" onClick={() => update({ shoutouts: [...form.shoutouts, { id: newId(), name: '', note: '' }] })}>+ Legg til shoutout</button></div>{form.shoutouts.length === 0 ? <div className="optional-empty"><strong>Ingen shoutout i dag?</strong><span>Helt i orden – du kan gå videre når du vil.</span></div> : <div className="shoutout-list">{form.shoutouts.map((shoutout) => <div className="shoutout-row" key={shoutout.id}><label>Navn<input value={shoutout.name} onChange={(event) => updateShoutout(shoutout.id, { name: event.target.value })} placeholder="Navn" /></label><label>Hva gjorde personen?<input value={shoutout.note} onChange={(event) => updateShoutout(shoutout.id, { note: event.target.value })} placeholder="Kort begrunnelse" /></label><button className="icon-button" type="button" aria-label={`Fjern shoutout for ${shoutout.name || 'ansatt'}`} onClick={() => update({ shoutouts: form.shoutouts.filter((item) => item.id !== shoutout.id) })}>×</button></div>)}</div>}<div className="step-actions"><button className="text-button" type="button" onClick={() => goToStep(2)}>← Til topp 3</button><button className="next-button" type="button" onClick={nextStep}>Videre til ASO og NPS <span aria-hidden="true">→</span></button></div></section>}
 
@@ -351,9 +370,10 @@ function App() {
       <section className="generate-panel"><div><h2>Lag Teams-utkastet</h2><p>Velg tone og glaze i neste vindu før utkastet blir generert.</p></div><button className="generate-button" type="button" onClick={openToneDialog}>Generer dagens tall <span aria-hidden="true">→</span></button></section>
       {error && <p className="message error" role="alert">{error}</p>}
 
-      {form.draft && <section className="panel draft-panel" aria-labelledby="draft-title"><div className="section-heading"><div><p className="eyebrow">UTKAST</p><h2 id="draft-title">{isTyping ? 'Skriver utkastet…' : 'Se over før du deler'}</h2></div><button className="copy-button" type="button" onClick={copyDraft} disabled={isTyping}>Kopier til Teams</button></div><textarea ref={draftRef} className="draft-area" rows={13} value={form.draft} onChange={(event) => update({ draft: event.target.value })} aria-label="Redigerbart Teams-utkast" readOnly={isTyping} />{!isTyping && unresolvedTokens.length > 0 && <p className="message warning">Disse plassholderne mangler lokale data eller er ukjente: {unresolvedTokens.join(', ')}. De beholdes i teksten.</p>}{copyStatus && <p className="message success">{copyStatus}</p>}</section>}
+      {showToneDialog && <div className="modal-backdrop" role="presentation"><section className="tone-dialog" role="dialog" aria-modal="true" aria-labelledby="tone-title" tabIndex={-1} ref={toneDialogRef}><button className="modal-close" type="button" onClick={() => setShowToneDialog(false)} aria-label="Lukk tonevindu">×</button><p className="eyebrow">SISTE STEG</p><h2 id="tone-title">Velg tonen på utkastet</h2><p className="section-intro">Tall og navn sendes ikke til AI. Dette styrer bare formuleringene.</p><label className="slider-field"><span><strong>Resultat</strong><output>{resultLabels[form.resultLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.resultLevel} onChange={(event) => update({ resultLevel: Number(event.target.value) })} /><small>Beskriver stemningen rundt dagens resultat.</small></label><label className="slider-field"><span><strong>Glaze</strong><output>{glazeLabels[form.glazeLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.glazeLevel} onChange={(event) => update({ glazeLevel: Number(event.target.value) })} /><small>Styrer hvor mye ekstra anerkjennelse AI-malen skal ha.</small></label><div className="modal-actions"><button className="text-button" type="button" onClick={() => setShowToneDialog(false)} disabled={loading}>Tilbake</button><button className="generate-button" type="button" onClick={generateDraft} disabled={loading}>{loading ? 'Lager utkast…' : 'Generer utkast'} <span aria-hidden="true">→</span></button></div></section></div>}
 
       {showToneDialog && <div className="modal-backdrop" role="presentation"><section className="tone-dialog" role="dialog" aria-modal="true" aria-labelledby="tone-title" tabIndex={-1} ref={toneDialogRef}><button className="modal-close" type="button" onClick={() => setShowToneDialog(false)} aria-label="Lukk tonevindu">×</button><p className="eyebrow">SISTE STEG</p><h2 id="tone-title">Velg tonen på utkastet</h2><p className="section-intro">Tall og navn sendes ikke til AI. Dette styrer bare formuleringene.</p><label className="slider-field"><span><strong>Resultat</strong><output>{resultLabels[form.resultLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.resultLevel} onChange={(event) => update({ resultLevel: Number(event.target.value) })} /><small>Beskriver stemningen rundt dagens resultat.</small></label><label className="slider-field"><span><strong>Glaze</strong><output>{glazeLabels[form.glazeLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.glazeLevel} onChange={(event) => update({ glazeLevel: Number(event.target.value) })} /><small>Styrer hvor mye ekstra anerkjennelse AI-malen skal ha.</small></label><div className="modal-actions"><button className="text-button" type="button" onClick={() => setShowToneDialog(false)} disabled={loading}>Tilbake</button><button className="generate-button" type="button" onClick={generateDraft} disabled={loading}>{loading ? 'Lager utkast…' : 'Generer utkast'} <span aria-hidden="true">→</span></button></div></section></div>}
+      {showDraftDialog && form.draft && <div className="modal-backdrop" role="presentation"><section className="tone-dialog draft-dialog" role="dialog" aria-modal="true" aria-labelledby="draft-dialog-title" tabIndex={-1} ref={draftDialogRef}><button className="modal-close" type="button" onClick={() => setShowDraftDialog(false)} aria-label="Lukk utkastvindu" disabled={isTyping}>×</button><p className="eyebrow">UTKAST</p><h2 id="draft-dialog-title">{isTyping ? 'Skriver utkastet…' : 'Se over før du deler'}</h2><p className="section-intro">Du kan redigere teksten før du kopierer den til Teams.</p><textarea ref={draftRef} className="draft-area" rows={15} value={form.draft} onChange={(event) => update({ draft: event.target.value })} aria-label="Redigerbart Teams-utkast" readOnly={isTyping} />{!isTyping && unresolvedTokens.length > 0 && <p className="message warning">Disse plassholderne mangler lokale data eller er ukjente: {unresolvedTokens.join(', ')}. De beholdes i teksten.</p>}{copyStatus && <p className="message success">{copyStatus}</p>}<div className="modal-actions"><button className="text-button" type="button" onClick={() => setShowDraftDialog(false)} disabled={isTyping}>Lukk</button><button className="copy-button" type="button" onClick={copyDraft} disabled={isTyping}>Kopier til Teams</button></div></section></div>}
     </main>
   )
 }
