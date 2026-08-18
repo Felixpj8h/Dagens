@@ -1,6 +1,4 @@
-fastapi
-uvicorn[standard]
-google-genai
-google-auth
-python-dotenv
+from fastapi import FastAPI 
+
+app = FastAPI()
 

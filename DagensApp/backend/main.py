@@ -1,4 +1,5 @@
 import os
+import datetime  
 from collections import defaultdict, deque
 from pathlib import Path
 from threading import Lock
@@ -24,6 +25,8 @@ google_client_id = os.getenv("GOOGLE_CLIENT_ID")
 allowed_email = os.getenv("ALLOWED_EMAIL", "").strip().lower()
 environment = os.getenv("ENVIRONMENT", "development").lower()
 frontend_origin = os.getenv("FRONTEND_ORIGIN", "").rstrip("/")
+date = datetime.datetime.now() 
+dateStr = date.strftime("%x")
 
 if not api_key:
     raise RuntimeError(
@@ -199,7 +202,7 @@ def generate_daily_report(
     nps_context = str(request.npsScore) if request.npsScore is not None else "Ingen NPS-score i dag."
 
     user_prompt = f"""
-Lag en Teams-klar dagsrapportmal for en norsk elektronikk kjede på bokmål.
+Lag en Teams-klar dagsrapportmal for en norsk elektronikk kjede på bokmål. dagen er {dateStr}.
 
 Resultatstemning: {result}
 
