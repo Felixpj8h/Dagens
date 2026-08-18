@@ -3,6 +3,7 @@
 :root { font-family: Manrope, Arial, sans-serif; color: #17251e; background: #f5f2ea; font-synthesis: none; text-rendering: optimizeLegibility; transition: background .25s ease, color .25s ease; }
 :root[data-theme='dark'] { color: #edf4ee; background: #111713; }
 :root[data-theme='dark'][data-result='under-budget'] { background: #210f14; }
+:root[data-theme='dark'][data-screen='login'] { background: #111713; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
 button, input, textarea { font: inherit; }

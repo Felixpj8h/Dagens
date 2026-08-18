@@ -7,10 +7,7 @@ interface GoogleAccountsId {
     client_id: string
     callback: (response: GoogleCredentialResponse) => void
   }) => void
-  renderButton: (
-    parent: HTMLElement,
-    options: { theme: 'outline'; size: 'large'; text: 'signin_with' },
-  ) => void
+  prompt: () => void
   disableAutoSelect: () => void
 }
 

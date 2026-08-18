@@ -54,7 +54,7 @@ const resultLabels = [
 ]
 
 const glazeLabels = [
-  'Nøktern',
+  'Vanlig Glaze',
   'Litt ekstra',
   'Varm',
   'Entusiastisk',
@@ -97,12 +97,12 @@ function App() {
   const [showDraftDialog, setShowDraftDialog] = useState(false)
   const [darkMode, setDarkMode] = useState(() => sessionStorage.getItem('dagens-tall-theme') !== 'light')
   const [idToken, setIdToken] = useState('')
+  const [googleReady, setGoogleReady] = useState(false)
   const [authError, setAuthError] = useState('')
   const [loading, setLoading] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
   const [error, setError] = useState('')
   const [copyStatus, setCopyStatus] = useState('')
-  const googleButtonRef = useRef<HTMLDivElement>(null)
   const toneDialogRef = useRef<HTMLDivElement>(null)
   const draftDialogRef = useRef<HTMLDivElement>(null)
   const draftRef = useRef<HTMLTextAreaElement>(null)
@@ -120,7 +120,7 @@ function App() {
     )
     const script = existingScript ?? document.createElement('script')
     const initializeGoogleLogin = () => {
-      if (!window.google || !googleButtonRef.current) return
+      if (!window.google) return
       window.google.accounts.id.initialize({
         client_id: googleClientId,
         callback: (response) => {
@@ -128,12 +128,7 @@ function App() {
           setAuthError('')
         },
       })
-      googleButtonRef.current.replaceChildren()
-      window.google.accounts.id.renderButton(googleButtonRef.current, {
-        theme: 'outline',
-        size: 'large',
-        text: 'signin_with',
-      })
+      setGoogleReady(true)
     }
 
     script.addEventListener('load', initializeGoogleLogin)
@@ -201,6 +196,10 @@ function App() {
   useEffect(() => {
     document.documentElement.dataset.result = hasNumbers && difference < 0 ? 'under-budget' : 'at-budget'
   }, [hasNumbers, difference])
+
+  useEffect(() => {
+    document.documentElement.dataset.screen = idToken ? 'app' : 'login'
+  }, [idToken])
 
   const tokens = useMemo(() => {
     const values: Record<string, string> = {}
@@ -348,12 +347,20 @@ function App() {
     setCopyStatus('')
   }
 
+  function startGoogleLogin() {
+    if (!window.google || !googleReady) {
+      setAuthError('Google-innlogging er ikke klar ennå. Prøv igjen om et øyeblikk.')
+      return
+    }
+    window.google.accounts.id.prompt()
+  }
+
   const deviationText = !hasNumbers ? 'Legg inn tall for å se avvik' : difference === 0 ? 'På budsjett' : `${difference > 0 ? '+' : '−'}${money.format(Math.abs(difference))} · ${Math.abs(percentage).toLocaleString('nb-NO', { maximumFractionDigits: 1 })} % ${difference > 0 ? 'over' : 'under'}`
   const npsNumber = Number(form.npsScore)
   const npsLabel = !form.npsScore ? 'Valgfritt' : npsNumber >= 80 ? 'Bra kundeopplevelse' : npsNumber >= 50 ? 'Middels kundeopplevelse' : 'Lav kundeopplevelse'
 
   if (!idToken) {
-    return <main className="login-shell"><section className="login-card" aria-labelledby="login-title"><p className="eyebrow">DAGSRAPPORT</p><h1 id="login-title">Dagens tall</h1><p>Logg inn med din godkjente Google-konto for å åpne rapportverktøyet.</p><div className="google-button" ref={googleButtonRef} />{authError && <p className="message error" role="alert">{authError}</p>}</section></main>
+    return <main className="login-shell"><section className="login-card" aria-labelledby="login-title"><p className="eyebrow">DAGSRAPPORT</p><h1 id="login-title">Dagens tall</h1><p>Logg inn med din godkjente Google-konto for å åpne rapportverktøyet.</p><button className="google-login-button" type="button" onClick={startGoogleLogin} disabled={!googleReady}><span aria-hidden="true">G</span>{googleReady ? 'Fortsett med Google' : 'Laster Google-innlogging…'}</button>{authError && <p className="message error" role="alert">{authError}</p>}</section></main>
   }
 
   const renderStepSummary = (step: Step) => {
