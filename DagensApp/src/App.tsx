@@ -412,14 +412,9 @@ function App() {
         <div>
           <p className="eyebrow">DAGSRAPPORT</p>
           <h1>Dagens tall</h1>
-          <p>Lag et Teams-klart utkast. Tall og selgerdata holdes lokalt.</p>
         </div>
 
         <div className="header-actions">
-          <div className="privacy-badge">
-            <span aria-hidden="true">✦</span>
-            Tall og selgerdata blir på din enhet
-          </div>
           <button className="sign-out-button" type="button" onClick={signOut}>Logg ut</button>
         </div>
       </header>
