@@ -232,8 +232,16 @@ function App() {
   const updateSeller = (index: number, patch: Partial<Seller>) => update({ sellers: form.sellers.map((seller, sellerIndex) => sellerIndex === index ? { ...seller, ...patch } : seller) })
   const updateShoutout = (id: string, patch: Partial<Shoutout>) => update({ shoutouts: form.shoutouts.map((shoutout) => shoutout.id === id ? { ...shoutout, ...patch } : shoutout) })
   const advanceSellerIfReady = (index: number) => {
-    const seller = form.sellers[index]
-    if (index < 2 && seller.name.trim() && seller.earnings !== '' && Number.isFinite(toNumber(seller.earnings))) setOpenSeller(index + 1)
+    window.setTimeout(() => {
+      const seller = form.sellers[index]
+      const sellerCard = document.querySelectorAll<HTMLElement>('.guided-seller')[index]
+
+      if (sellerCard?.contains(document.activeElement)) return
+
+      if (index < 2 && seller.name.trim() && seller.earnings !== '' && Number.isFinite(toNumber(seller.earnings))) {
+        setOpenSeller(index + 1)
+      }
+    }, 0)
   }
 
   const validate = () => {
