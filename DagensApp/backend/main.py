@@ -142,7 +142,7 @@ def authenticate_request(request: Request) -> str:
     email = str(token_info.get("email", "")).strip().lower()
     email_verified = token_info.get("email_verified") is True
 
-    if not email_verified or email != allowed_email:
+    if not email.lower() not in allowed_emails: 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Denne Google-kontoen har ikke tilgang til Dagens tall.",
