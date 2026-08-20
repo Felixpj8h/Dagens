@@ -22,11 +22,13 @@ load_dotenv(Path(__file__).with_name(".env"))
 
 api_key = os.getenv("GEMINI_API_KEY")
 google_client_id = os.getenv("GOOGLE_CLIENT_ID")
-allowed_emails = {
+allowed_email_list = [
     email.strip().lower()
     for email in os.getenv("ALLOWED_EMAILS", "").split(",")
     if email.strip()
-}
+]
+allowed_emails = set(allowed_email_list)
+developer_email = allowed_email_list[0] if allowed_email_list else ""
 environment = os.getenv("ENVIRONMENT", "development").lower()
 frontend_origin = os.getenv("FRONTEND_ORIGIN", "").rstrip("/")
 date = datetime.datetime.now() 
@@ -61,7 +63,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=False,
-    allow_methods=["POST"],
+    allow_methods=["GET", "POST"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -99,6 +101,10 @@ class GenerateReportRequest(BaseModel):
 
 class GenerateReportResponse(BaseModel):
     template: str
+
+
+class SessionResponse(BaseModel):
+    canUseDevMode: bool
 
 
 RESULT_LEVELS = {
@@ -172,6 +178,11 @@ def enforce_generation_limit(email: str) -> None:
 @app.get("/api/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/api/session", response_model=SessionResponse)
+def get_session(email: str = Depends(authenticate_request)):
+    return SessionResponse(canUseDevMode=email == developer_email)
 
 
 @app.post(

@@ -98,6 +98,8 @@ function App() {
   const [darkMode, setDarkMode] = useState(() => sessionStorage.getItem('dagens-tall-theme') !== 'light')
   const [idToken, setIdToken] = useState('')
   const [googleReady, setGoogleReady] = useState(false)
+  const [canUseDevMode, setCanUseDevMode] = useState(false)
+  const [devDataLoaded, setDevDataLoaded] = useState(() => sessionStorage.getItem('dagens-tall-dev-data') === 'true')
   const [authError, setAuthError] = useState('')
   const [loading, setLoading] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
@@ -147,6 +149,34 @@ function App() {
   useEffect(() => {
     sessionStorage.setItem(storageKey, JSON.stringify(form))
   }, [form])
+
+  useEffect(() => {
+    sessionStorage.setItem('dagens-tall-dev-data', String(devDataLoaded))
+  }, [devDataLoaded])
+
+  useEffect(() => {
+    if (!idToken) {
+      setCanUseDevMode(false)
+      return
+    }
+
+    const loadSession = async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/session`, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        })
+        const data: unknown = await response.json()
+
+        if (response.ok && data && typeof data === 'object' && 'canUseDevMode' in data && typeof data.canUseDevMode === 'boolean') {
+          setCanUseDevMode(data.canUseDevMode)
+        }
+      } catch {
+        setCanUseDevMode(false)
+      }
+    }
+
+    void loadSession()
+  }, [idToken])
 
   useEffect(() => {
     sessionStorage.setItem('dagens-tall-theme', darkMode ? 'dark' : 'light')
@@ -355,6 +385,38 @@ function App() {
     setCopyStatus('')
   }
 
+  function loadDevData() {
+    setForm({
+      ...defaultState,
+      budget: '50000',
+      earnings: '60000',
+      sellers: [
+        { name: 'Foo', earnings: '12000', notableSale: 'TV' },
+        { name: 'Bar', earnings: '10000', notableSale: 'oppvaskmaskin' },
+        { name: 'Baz', earnings: '3500', notableSale: '' },
+      ],
+      shoutouts: [
+        { id: newId(), name: 'Foo', note: 'tok panten' },
+      ],
+      asoComment: 'Bra jobbet',
+      npsScore: '85',
+    })
+    setActiveStep(1)
+    setOpenSeller(0)
+    setDevDataLoaded(true)
+    setError('')
+    setCopyStatus('')
+  }
+
+  function clearDevData() {
+    setForm(defaultState)
+    setActiveStep(1)
+    setOpenSeller(0)
+    setDevDataLoaded(false)
+    setError('')
+    setCopyStatus('')
+  }
+
   function startGoogleLogin() {
     if (!window.google || !googleReady) {
       setAuthError('Google-innlogging er ikke klar ennå. Prøv igjen om et øyeblikk.')
@@ -380,7 +442,7 @@ function App() {
 
   return (
     <main className={`app-shell ${hasNumbers && difference < 0 ? 'under-budget' : 'at-budget'} ${darkMode ? 'dark-mode' : ''}`}>
-      <header className="page-header"><div><p className="eyebrow">DAGSRAPPORT</p><h1>Dagens tall</h1><p>Fyll ut litt om gangen – alt lagres i denne nettleserøkten.</p></div><div className="header-actions"><label className="theme-switch"><input type="checkbox" checked={darkMode} onChange={(event) => setDarkMode(event.target.checked)} /><span aria-hidden="true" /><strong>Mørk modus</strong></label>{form.draft && <button className="draft-shortcut" type="button" onClick={() => setShowDraftDialog(true)}>Åpne utkast</button>}<button className="sign-out-button" type="button" onClick={signOut}>Logg ut</button></div></header>
+      <header className="page-header"><div><p className="eyebrow">DAGSRAPPORT</p><h1>Dagens tall</h1><p>Fyll ut litt om gangen – alt lagres i denne nettleserøkten.</p></div><div className="header-actions"><label className="theme-switch"><input type="checkbox" checked={darkMode} onChange={(event) => setDarkMode(event.target.checked)} /><span aria-hidden="true" /><strong>Mørk modus</strong></label>{canUseDevMode && <button className="dev-button" type="button" onClick={devDataLoaded ? clearDevData : loadDevData}>{devDataLoaded ? 'Fjern testdata' : 'Fyll inn testdata'}</button>}{form.draft && <button className="draft-shortcut" type="button" onClick={() => setShowDraftDialog(true)}>Åpne utkast</button>}<button className="sign-out-button" type="button" onClick={signOut}>Logg ut</button></div></header>
 
       <nav className="progress-nav" aria-label="Steg i dagsrapporten">
         {steps.map((step) => <button key={step.number} type="button" className={`progress-step ${activeStep === step.number ? 'active' : ''} ${activeStep > step.number ? 'complete' : ''}`} onClick={() => goToStep(step.number)} aria-current={activeStep === step.number ? 'step' : undefined}><span>{step.number}</span><strong>{step.label}</strong></button>)}
