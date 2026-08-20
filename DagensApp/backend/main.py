@@ -24,7 +24,7 @@ api_key = os.getenv("GEMINI_API_KEY")
 google_client_id = os.getenv("GOOGLE_CLIENT_ID")
 allowed_emails = {
     email.strip().lower()
-    for email in os.environ["ALLOWED_EMAILS"].split(",")
+    for email in os.getenv("ALLOWED_EMAILS", "").split(",")
     if email.strip()
 }
 environment = os.getenv("ENVIRONMENT", "development").lower()
@@ -40,8 +40,8 @@ if not api_key:
 if not google_client_id:
     raise RuntimeError("GOOGLE_CLIENT_ID mangler. Legg den inn i backend/.env")
 
-if not allowed_email:
-    raise RuntimeError("ALLOWED_EMAIL mangler. Legg den inn i backend/.env")
+if not allowed_emails:
+    raise RuntimeError("ALLOWED_EMAILS mangler. Legg den inn i backend/.env")
 
 if environment == "production" and not frontend_origin:
     raise RuntimeError("FRONTEND_ORIGIN mangler i produksjon.")
@@ -142,7 +142,7 @@ def authenticate_request(request: Request) -> str:
     email = str(token_info.get("email", "")).strip().lower()
     email_verified = token_info.get("email_verified") is True
 
-    if not email.lower() not in allowed_emails: 
+    if not email_verified or email not in allowed_emails:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Denne Google-kontoen har ikke tilgang til Dagens tall.",
