@@ -22,7 +22,11 @@ load_dotenv(Path(__file__).with_name(".env"))
 
 api_key = os.getenv("GEMINI_API_KEY")
 google_client_id = os.getenv("GOOGLE_CLIENT_ID")
-allowed_email = os.getenv("ALLOWED_EMAIL", "").strip().lower()
+allowed_emails = {
+    email.strip().lower()
+    for email in os.environ["ALLOWED_EMAILS"].split(",")
+    if email.strip()
+}
 environment = os.getenv("ENVIRONMENT", "development").lower()
 frontend_origin = os.getenv("FRONTEND_ORIGIN", "").rstrip("/")
 date = datetime.datetime.now() 
