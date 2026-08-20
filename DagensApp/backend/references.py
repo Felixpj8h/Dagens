@@ -1,6 +1,7 @@
 GLAZE_REFERENCES = {
     1: """
     Stil: Kort, rolig og profesjonell.
+    Viktig at denne er kort og konsis. 
     Eksempel:
     "Ender dagen med å ta budsjettet med [I] GM. 
     På første lander [S1] med [SI1] GM. 

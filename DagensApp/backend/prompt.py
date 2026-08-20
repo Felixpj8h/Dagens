@@ -24,4 +24,5 @@ Regler:
 - Ikke finn opp tall, navn, salg eller shoutouts.
 - Bruk plassholdere der konkret informasjon trengs.
 - Teksten skal fungere som en melding i Microsoft Teams.
+- husk at orbruken kan være enkel. 
 """

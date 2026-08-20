@@ -368,7 +368,7 @@ function App() {
   const npsLabel = !form.npsScore ? 'Valgfritt' : npsNumber >= 80 ? 'Bra kundeopplevelse' : npsNumber >= 50 ? 'Middels kundeopplevelse' : 'Lav kundeopplevelse'
 
   if (!idToken) {
-    return <main className="login-shell"><section className="login-card" aria-labelledby="login-title"><p className="eyebrow">DAGSRAPPORT</p><h1 id="login-title">Dagens tall</h1><p>Logg inn med din godkjente Google-konto for å åpne rapportverktøyet.</p><button className="google-login-button" type="button" onClick={startGoogleLogin} disabled={!googleReady}><span aria-hidden="true">G</span>{googleReady ? 'Fortsett med Google' : 'Laster Google-innlogging…'}</button>{authError && <p className="message error" role="alert">{authError}</p>}</section></main>
+    return <main className="login-shell"><section className="login-card" aria-labelledby="login-title"><p className="eyebrow">DAGSRAPPORT</p><h1 id="login-title">Dagens tall</h1><p>Logg inn med din Google-konto.</p><button className="google-login-button" type="button" onClick={startGoogleLogin} disabled={!googleReady}>{googleReady ? 'Fortsett med Google' : 'Laster Google-innlogging…'}</button>{authError && <p className="message error" role="alert">{authError}</p>}</section></main>
   }
 
   const renderStepSummary = (step: Step) => {
