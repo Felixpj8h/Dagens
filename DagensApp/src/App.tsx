@@ -103,6 +103,7 @@ function App() {
   const [authError, setAuthError] = useState('')
   const [loading, setLoading] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
+  const [isFillingTokens, setIsFillingTokens] = useState(false)
   const [error, setError] = useState('')
   const [copyStatus, setCopyStatus] = useState('')
   const toneDialogRef = useRef<HTMLDivElement>(null)
@@ -187,13 +188,13 @@ function App() {
     if (!showToneDialog && !showDraftDialog) return
     ;(showToneDialog ? toneDialogRef : draftDialogRef).current?.focus()
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || loading || isTyping) return
+      if (event.key !== 'Escape' || loading || isTyping || isFillingTokens) return
       if (showToneDialog) setShowToneDialog(false)
       if (showDraftDialog) setShowDraftDialog(false)
     }
 
     const closeOnBackdropClick = (event: MouseEvent) => {
-      if (loading || isTyping || !(event.target instanceof HTMLElement)) return
+      if (loading || isTyping || isFillingTokens || !(event.target instanceof HTMLElement)) return
       if (!event.target.classList.contains('modal-backdrop')) return
       if (showToneDialog) setShowToneDialog(false)
       if (showDraftDialog) setShowDraftDialog(false)
@@ -205,7 +206,7 @@ function App() {
       window.removeEventListener('keydown', closeOnEscape)
       window.removeEventListener('mousedown', closeOnBackdropClick)
     }
-  }, [showToneDialog, showDraftDialog, loading, isTyping])
+  }, [showToneDialog, showDraftDialog, loading, isTyping, isFillingTokens])
 
   useEffect(() => {
     if (form.draft) draftRef.current?.focus()
@@ -311,23 +312,107 @@ function App() {
     goToStep(3)
   }
 
-  const writeDraft = (draft: string) => {
+  const scrollDraftToBottom = () => {
+    window.requestAnimationFrame(() => {
+      const draftArea = draftRef.current
+      if (draftArea) draftArea.scrollTop = draftArea.scrollHeight
+    })
+  }
+
+  const followDraftCursor = (position: number, scanLength = 0) => {
+    window.requestAnimationFrame(() => {
+      const draftArea = draftRef.current
+      if (!draftArea) return
+
+      const cursorPosition = Math.min(position, draftArea.value.length)
+      draftArea.focus()
+      draftArea.setSelectionRange(
+        cursorPosition,
+        Math.min(cursorPosition + scanLength, draftArea.value.length),
+      )
+
+      if (scanLength > 0) {
+        const maxScroll = Math.max(0, draftArea.scrollHeight - draftArea.clientHeight)
+        const progress = cursorPosition / Math.max(1, draftArea.value.length)
+        draftArea.scrollTop = maxScroll * progress
+      }
+    })
+  }
+
+  const writeDraft = (template: string, populatedDraft: string) => {
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
 
     setIsTyping(true)
+    setIsFillingTokens(false)
     setShowDraftDialog(true)
     update({ draft: '' })
     let position = 0
 
     const typeNext = () => {
-      position = Math.min(position + 4, draft.length)
-      update({ draft: draft.slice(0, position) })
+      position = Math.min(position + 4, template.length)
+      update({ draft: template.slice(0, position) })
+      scrollDraftToBottom()
 
-      if (position < draft.length) {
+      if (position < template.length) {
         typingTimerRef.current = setTimeout(typeNext, 9)
       } else {
-        typingTimerRef.current = null
         setIsTyping(false)
+        setIsFillingTokens(true)
+        typingTimerRef.current = setTimeout(() => {
+          const draftArea = draftRef.current
+          if (draftArea) {
+            // Start the local fill pass at the beginning of the template. Keeping
+            // this explicit avoids the textarea retaining its previous bottom scroll.
+            draftArea.scrollTop = 0
+            draftArea.focus()
+            draftArea.setSelectionRange(0, 0)
+          }
+
+          const replaceTokensThroughCursor = (rawPosition: number) => {
+            const tokenPattern = /\[([A-Z0-9_]+)\]/g
+            let rawIndex = 0
+            let prefix = ''
+            let match: RegExpExecArray | null
+
+            while ((match = tokenPattern.exec(template))) {
+              const [fullToken, key] = match
+              const tokenEnd = match.index + fullToken.length
+
+              if (tokenEnd > rawPosition) break
+
+              prefix += template.slice(rawIndex, match.index)
+              prefix += tokens[key] ?? fullToken
+              rawIndex = tokenEnd
+            }
+
+            return {
+              draft: prefix + template.slice(rawIndex),
+              cursor: prefix.length + Math.max(0, rawPosition - rawIndex),
+            }
+          }
+
+          let hydratedPosition = 0
+          const hydrateNext = () => {
+            hydratedPosition = Math.min(hydratedPosition + 3, template.length)
+            const frame = replaceTokensThroughCursor(hydratedPosition)
+            update({ draft: frame.draft })
+            // Select a short piece of the unprocessed text as a visible scanner.
+            // Tokens behind that selection have already been replaced locally.
+            followDraftCursor(frame.cursor, 6)
+
+            if (hydratedPosition < template.length) {
+              typingTimerRef.current = setTimeout(hydrateNext, 18)
+            } else {
+              update({ draft: populatedDraft })
+              followDraftCursor(populatedDraft.length)
+              setIsFillingTokens(false)
+              typingTimerRef.current = null
+            }
+          }
+
+          followDraftCursor(0)
+          typingTimerRef.current = setTimeout(hydrateNext, 360)
+        }, 450)
       }
     }
 
@@ -358,7 +443,7 @@ function App() {
       }
       const data: unknown = await response.json()
       if (!data || typeof data !== 'object' || !('template' in data) || typeof data.template !== 'string') throw new Error('Backend returnerte ikke en gyldig mal.')
-      writeDraft(replaceTokens(data.template))
+      writeDraft(data.template, replaceTokens(data.template))
       setShowToneDialog(false)
     } catch (caught) {
       if (caught instanceof Error && /logg inn|Google-innlogging/i.test(caught.message)) setIdToken('')
@@ -369,7 +454,7 @@ function App() {
   }
 
   async function copyDraft() {
-    if (!form.draft) return
+    if (!form.draft || isTyping || isFillingTokens) return
     try {
       await navigator.clipboard.writeText(form.draft)
       setCopyStatus('Kopiert – klart til å limes inn i Teams.')
@@ -466,7 +551,20 @@ function App() {
       {showToneDialog && <div className="modal-backdrop" role="presentation"><section className="tone-dialog" role="dialog" aria-modal="true" aria-labelledby="tone-title" tabIndex={-1} ref={toneDialogRef}><button className="modal-close" type="button" onClick={() => setShowToneDialog(false)} aria-label="Lukk tonevindu">×</button><p className="eyebrow">SISTE STEG</p><h2 id="tone-title">Velg tonen på utkastet</h2><p className="section-intro">Tall og navn sendes ikke til AI. Dette styrer bare formuleringene.</p><label className="slider-field"><span><strong>Resultat</strong><output>{resultLabels[form.resultLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.resultLevel} onChange={(event) => update({ resultLevel: Number(event.target.value) })} /><small>Beskriver stemningen rundt dagens resultat.</small></label><label className="slider-field"><span><strong>Glaze</strong><output>{glazeLabels[form.glazeLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.glazeLevel} onChange={(event) => update({ glazeLevel: Number(event.target.value) })} /><small>Styrer hvor mye ekstra anerkjennelse AI-malen skal ha.</small></label><div className="modal-actions"><button className="text-button" type="button" onClick={() => setShowToneDialog(false)} disabled={loading}>Tilbake</button><button className="generate-button" type="button" onClick={generateDraft} disabled={loading}>{loading ? 'Lager utkast…' : 'Generer utkast'} <span aria-hidden="true">→</span></button></div></section></div>}
 
       {showToneDialog && <div className="modal-backdrop" role="presentation"><section className="tone-dialog" role="dialog" aria-modal="true" aria-labelledby="tone-title" tabIndex={-1} ref={toneDialogRef}><button className="modal-close" type="button" onClick={() => setShowToneDialog(false)} aria-label="Lukk tonevindu">×</button><p className="eyebrow">SISTE STEG</p><h2 id="tone-title">Velg tonen på utkastet</h2><p className="section-intro">Tall og navn sendes ikke til AI. Dette styrer bare formuleringene.</p><label className="slider-field"><span><strong>Resultat</strong><output>{resultLabels[form.resultLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.resultLevel} onChange={(event) => update({ resultLevel: Number(event.target.value) })} /><small>Beskriver stemningen rundt dagens resultat.</small></label><label className="slider-field"><span><strong>Glaze</strong><output>{glazeLabels[form.glazeLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.glazeLevel} onChange={(event) => update({ glazeLevel: Number(event.target.value) })} /><small>Styrer hvor mye ekstra anerkjennelse AI-malen skal ha.</small></label><div className="modal-actions"><button className="text-button" type="button" onClick={() => setShowToneDialog(false)} disabled={loading}>Tilbake</button><button className="generate-button" type="button" onClick={generateDraft} disabled={loading}>{loading ? 'Lager utkast…' : 'Generer utkast'} <span aria-hidden="true">→</span></button></div></section></div>}
-      {showDraftDialog && form.draft && <div className="modal-backdrop" role="presentation"><section className="tone-dialog draft-dialog" role="dialog" aria-modal="true" aria-labelledby="draft-dialog-title" tabIndex={-1} ref={draftDialogRef}><button className="modal-close" type="button" onClick={() => setShowDraftDialog(false)} aria-label="Lukk utkastvindu" disabled={isTyping}>×</button><p className="eyebrow">UTKAST</p><h2 id="draft-dialog-title">{isTyping ? 'Skriver utkastet…' : 'Se over før du deler'}</h2><p className="section-intro">Du kan redigere teksten før du kopierer den til Teams.</p><textarea ref={draftRef} className="draft-area" rows={15} value={form.draft} onChange={(event) => update({ draft: event.target.value })} aria-label="Redigerbart Teams-utkast" readOnly={isTyping} />{!isTyping && unresolvedTokens.length > 0 && <p className="message warning">Disse plassholderne mangler lokale data eller er ukjente: {unresolvedTokens.join(', ')}. De beholdes i teksten.</p>}{copyStatus && <p className="message success">{copyStatus}</p>}<div className="modal-actions"><button className="text-button" type="button" onClick={() => setShowDraftDialog(false)} disabled={isTyping}>Lukk</button><button className="copy-button" type="button" onClick={copyDraft} disabled={isTyping}>Kopier til Teams</button></div></section></div>}
+      {showDraftDialog && form.draft && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="tone-dialog draft-dialog" role="dialog" aria-modal="true" aria-labelledby="draft-dialog-title" tabIndex={-1} ref={draftDialogRef}>
+            <button className="modal-close" type="button" onClick={() => setShowDraftDialog(false)} aria-label="Lukk utkastvindu" disabled={isTyping || isFillingTokens}>×</button>
+            <p className="eyebrow">UTKAST</p>
+            <h2 id="draft-dialog-title">{isTyping ? 'Skriver AI-malen…' : isFillingTokens ? 'Fyller inn lokale data…' : 'Se over før du deler'}</h2>
+            <p className="section-intro">AI-malen vises først med plassholdere. Tall og navn fylles deretter inn lokalt i nettleseren.</p>
+            <textarea ref={draftRef} className={`draft-area ${isFillingTokens ? 'hydrating' : ''}`} rows={15} value={form.draft} onChange={(event) => update({ draft: event.target.value })} aria-label="Redigerbart Teams-utkast" readOnly={isTyping || isFillingTokens} />
+            {!isTyping && !isFillingTokens && unresolvedTokens.length > 0 && <p className="message warning">Disse plassholderne mangler lokale data eller er ukjente: {unresolvedTokens.join(', ')}. De beholdes i teksten.</p>}
+            {copyStatus && <p className="message success">{copyStatus}</p>}
+            <div className="modal-actions"><button className="text-button" type="button" onClick={() => setShowDraftDialog(false)} disabled={isTyping || isFillingTokens}>Lukk</button><button className="copy-button" type="button" onClick={copyDraft} disabled={isTyping || isFillingTokens}>Kopier til Teams</button></div>
+          </section>
+        </div>
+      )}
     </main>
   )
 }
