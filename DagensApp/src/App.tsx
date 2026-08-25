@@ -12,6 +12,7 @@ type FormState = {
   shoutouts: Shoutout[]
   asoComment: string
   npsScore: string
+  rushLevel: number
   glazeLevel: number
   resultLevel: number
   draft: string
@@ -40,6 +41,7 @@ const defaultState: FormState = {
   shoutouts: [],
   asoComment: '',
   npsScore: '',
+  rushLevel: 3,
   glazeLevel: 3,
   resultLevel: 3,
   draft: '',
@@ -59,6 +61,14 @@ const glazeLabels = [
   'Varm',
   'Entusiastisk',
   'Full glaze',
+]
+
+const rushLabels = [
+  'Svært lite folk',
+  'Lite kundetrykk',
+  'Vanlig kundetrykk',
+  'Høyt kundetrykk',
+  'Stort kundetrykk',
 ]
 
 function readStoredState(): FormState {
@@ -362,6 +372,7 @@ function App() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           resultLevel: form.resultLevel,
+          rushLevel: form.rushLevel,
           glazeLevel: form.glazeLevel,
           shoutouts: form.shoutouts.flatMap((shoutout, index) => shoutout.name.trim() && shoutout.note.trim() ? [{ slot: index + 1, note: shoutout.note.trim() }] : []),
           notableSales: form.sellers.flatMap((seller, index) => seller.name.trim() && seller.notableSale.trim() ? [{ slot: index + 1, note: seller.notableSale.trim() }] : []),
@@ -473,9 +484,39 @@ function App() {
       <section className="generate-panel"><div><h2>Lag Teams-utkastet</h2><p>Velg tone og glaze i neste vindu før utkastet blir generert.</p></div><div className="generate-actions">{form.draft && <button className="draft-shortcut on-panel" type="button" onClick={() => setShowDraftDialog(true)}>Åpne forrige utkast</button>}<button className="generate-button" type="button" onClick={openToneDialog}>Generer dagens tall <span aria-hidden="true">→</span></button></div></section>
       {error && <p className="message error" role="alert">{error}</p>}
 
-      {showToneDialog && <div className="modal-backdrop" role="presentation"><section className="tone-dialog" role="dialog" aria-modal="true" aria-labelledby="tone-title" tabIndex={-1} ref={toneDialogRef}><button className="modal-close" type="button" onClick={() => setShowToneDialog(false)} aria-label="Lukk tonevindu">×</button><p className="eyebrow">SISTE STEG</p><h2 id="tone-title">Velg tonen på utkastet</h2><p className="section-intro">Tall og navn sendes ikke til AI. Dette styrer bare formuleringene.</p><label className="slider-field"><span><strong>Resultat</strong><output>{resultLabels[form.resultLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.resultLevel} onChange={(event) => update({ resultLevel: Number(event.target.value) })} /><small>Beskriver stemningen rundt dagens resultat.</small></label><label className="slider-field"><span><strong>Glaze</strong><output>{glazeLabels[form.glazeLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.glazeLevel} onChange={(event) => update({ glazeLevel: Number(event.target.value) })} /><small>Styrer hvor mye ekstra anerkjennelse AI-malen skal ha.</small></label><div className="modal-actions"><button className="text-button" type="button" onClick={() => setShowToneDialog(false)} disabled={loading}>Tilbake</button><button className="generate-button" type="button" onClick={generateDraft} disabled={loading}>{loading ? 'Lager utkast…' : 'Generer utkast'} <span aria-hidden="true">→</span></button></div></section></div>}
+      {showToneDialog && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="tone-dialog" role="dialog" aria-modal="true" aria-labelledby="tone-title" tabIndex={-1} ref={toneDialogRef}>
+            <button className="modal-close" type="button" onClick={() => setShowToneDialog(false)} aria-label="Lukk tonevindu">×</button>
+            <p className="eyebrow">SISTE STEG</p>
+            <h2 id="tone-title">Velg tonen på utkastet</h2>
+            <p className="section-intro">Tall og navn sendes ikke til AI. Dette styrer bare formuleringene.</p>
 
-      {showToneDialog && <div className="modal-backdrop" role="presentation"><section className="tone-dialog" role="dialog" aria-modal="true" aria-labelledby="tone-title" tabIndex={-1} ref={toneDialogRef}><button className="modal-close" type="button" onClick={() => setShowToneDialog(false)} aria-label="Lukk tonevindu">×</button><p className="eyebrow">SISTE STEG</p><h2 id="tone-title">Velg tonen på utkastet</h2><p className="section-intro">Tall og navn sendes ikke til AI. Dette styrer bare formuleringene.</p><label className="slider-field"><span><strong>Resultat</strong><output>{resultLabels[form.resultLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.resultLevel} onChange={(event) => update({ resultLevel: Number(event.target.value) })} /><small>Beskriver stemningen rundt dagens resultat.</small></label><label className="slider-field"><span><strong>Glaze</strong><output>{glazeLabels[form.glazeLevel - 1]}</output></span><input type="range" min="1" max="5" step="1" value={form.glazeLevel} onChange={(event) => update({ glazeLevel: Number(event.target.value) })} /><small>Styrer hvor mye ekstra anerkjennelse AI-malen skal ha.</small></label><div className="modal-actions"><button className="text-button" type="button" onClick={() => setShowToneDialog(false)} disabled={loading}>Tilbake</button><button className="generate-button" type="button" onClick={generateDraft} disabled={loading}>{loading ? 'Lager utkast…' : 'Generer utkast'} <span aria-hidden="true">→</span></button></div></section></div>}
+            <label className="slider-field">
+              <span><strong>Resultat</strong><output>{resultLabels[form.resultLevel - 1]}</output></span>
+              <input type="range" min="1" max="5" step="1" value={form.resultLevel} onChange={(event) => update({ resultLevel: Number(event.target.value) })} />
+              <small>Beskriver stemningen rundt dagens resultat.</small>
+            </label>
+
+            <label className="slider-field">
+              <span><strong>Kundetrykk</strong><output>{rushLabels[form.rushLevel - 1]}</output></span>
+              <input type="range" min="1" max="5" step="1" value={form.rushLevel} onChange={(event) => update({ rushLevel: Number(event.target.value) })} />
+              <small>Forteller AI-en hvor mye kundetrykk dere har hatt i løpet av dagen.</small>
+            </label>
+
+            <label className="slider-field">
+              <span><strong>Glaze</strong><output>{glazeLabels[form.glazeLevel - 1]}</output></span>
+              <input type="range" min="1" max="5" step="1" value={form.glazeLevel} onChange={(event) => update({ glazeLevel: Number(event.target.value) })} />
+              <small>Styrer hvor mye ekstra anerkjennelse AI-malen skal ha.</small>
+            </label>
+
+            <div className="modal-actions">
+              <button className="text-button" type="button" onClick={() => setShowToneDialog(false)} disabled={loading}>Tilbake</button>
+              <button className="generate-button" type="button" onClick={generateDraft} disabled={loading}>{loading ? 'Lager utkast…' : 'Generer utkast'} <span aria-hidden="true">→</span></button>
+            </div>
+          </section>
+        </div>
+      )}
       {showDraftDialog && form.draft && <div className="modal-backdrop" role="presentation"><section className="tone-dialog draft-dialog" role="dialog" aria-modal="true" aria-labelledby="draft-dialog-title" tabIndex={-1} ref={draftDialogRef}><button className="modal-close" type="button" onClick={() => setShowDraftDialog(false)} aria-label="Lukk utkastvindu" disabled={isTyping}>×</button><p className="eyebrow">UTKAST</p><h2 id="draft-dialog-title">{isTyping ? 'Skriver utkastet…' : 'Se over før du deler'}</h2><p className="section-intro">Du kan redigere teksten før du kopierer den til Teams.</p><textarea ref={draftRef} className="draft-area" rows={15} value={form.draft} onChange={(event) => update({ draft: event.target.value })} aria-label="Redigerbart Teams-utkast" readOnly={isTyping} />{!isTyping && unresolvedTokens.length > 0 && <p className="message warning">Disse plassholderne mangler lokale data eller er ukjente: {unresolvedTokens.join(', ')}. De beholdes i teksten.</p>}{copyStatus && <p className="message success">{copyStatus}</p>}<div className="modal-actions"><button className="text-button" type="button" onClick={() => setShowDraftDialog(false)} disabled={isTyping}>Lukk</button><button className="copy-button" type="button" onClick={copyDraft} disabled={isTyping}>Kopier til Teams</button></div></section></div>}
     </main>
   )

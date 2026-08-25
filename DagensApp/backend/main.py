@@ -92,6 +92,7 @@ class GenerateReportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     resultLevel: int = Field(ge=1, le=5)
+    rushLevel: int = Field(ge=1, le=5)
     glazeLevel: int = Field(ge=1, le=5)
     shoutouts: list[Shoutout] = Field(default_factory=list, max_length=10)
     notableSales: list[NotableSale] = Field(default_factory=list, max_length=3)
@@ -113,6 +114,14 @@ RESULT_LEVELS = {
     3: "på budsjett",
     4: "over budsjett",
     5: "knust budsjettet",
+}
+
+RUSH_LEVEL = {
+    1: "svært lite kundetrykk",
+    2: "lite kundetrykk",
+    3: "vanlig kundetrykk",
+    4: "høyt kundetrykk",
+    5: "svært høyt kundetrykk",
 }
 
 
@@ -195,6 +204,7 @@ def generate_daily_report(
 ):
     enforce_generation_limit(email)
     result = RESULT_LEVELS[request.resultLevel]
+    rush = RUSH_LEVEL[request.rushLevel]
     reference = GLAZE_REFERENCES[request.glazeLevel]
 
     shoutout_context = "\n".join(
@@ -220,6 +230,7 @@ def generate_daily_report(
 Lag en Teams-klar dagsrapportmal for en norsk elektronikk kjede på bokmål. dagen er {dateStr}.
 
 Resultatstemning: {result}
+Kundetrykk: {rush}
 
 Skrivestilreferanse:
 {reference}
