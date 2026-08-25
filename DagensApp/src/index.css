@@ -4,6 +4,9 @@
 :root[data-theme='dark'] { color: #edf4ee; background: #111713; }
 :root[data-theme='dark'][data-result='under-budget'] { background: #210f14; }
 :root[data-theme='dark'][data-screen='login'] { background: #111713; }
+:root[data-screen='login'],
+:root[data-theme='dark'][data-screen='login'],
+:root[data-theme='dark'][data-result='under-budget'][data-screen='login'] { background: #f5f2ea; color: #17251e; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
 button, input, textarea { font: inherit; }

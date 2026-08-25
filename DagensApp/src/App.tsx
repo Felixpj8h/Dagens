@@ -108,6 +108,7 @@ function App() {
   const toneDialogRef = useRef<HTMLDivElement>(null)
   const draftDialogRef = useRef<HTMLDivElement>(null)
   const draftRef = useRef<HTMLTextAreaElement>(null)
+  const googleButtonRef = useRef<HTMLDivElement>(null)
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -145,6 +146,23 @@ function App() {
     }
     return () => script.removeEventListener('load', initializeGoogleLogin)
   }, [idToken])
+
+  useEffect(() => {
+    const buttonContainer = googleButtonRef.current
+    if (idToken || !googleReady || !window.google || !buttonContainer) return
+
+    buttonContainer.replaceChildren()
+    window.google.accounts.id.renderButton(buttonContainer, {
+      type: 'standard',
+      theme: 'filled_black',
+      size: 'large',
+      text: 'continue_with',
+      shape: 'rectangular',
+      logo_alignment: 'left',
+      locale: 'no',
+      width: Math.min(388, Math.max(280, buttonContainer.clientWidth || 388)),
+    })
+  }, [googleReady, idToken])
 
   useEffect(() => {
     sessionStorage.setItem(storageKey, JSON.stringify(form))
@@ -417,20 +435,12 @@ function App() {
     setCopyStatus('')
   }
 
-  function startGoogleLogin() {
-    if (!window.google || !googleReady) {
-      setAuthError('Google-innlogging er ikke klar ennå. Prøv igjen om et øyeblikk.')
-      return
-    }
-    window.google.accounts.id.prompt()
-  }
-
   const deviationText = !hasNumbers ? 'Legg inn tall for å se avvik' : difference === 0 ? 'På budsjett' : `${difference > 0 ? '+' : '−'}${money.format(Math.abs(difference))} · ${Math.abs(percentage).toLocaleString('nb-NO', { maximumFractionDigits: 1 })} % ${difference > 0 ? 'over' : 'under'}`
   const npsNumber = Number(form.npsScore)
   const npsLabel = !form.npsScore ? 'Valgfritt' : npsNumber >= 80 ? 'Bra kundeopplevelse' : npsNumber >= 50 ? 'Middels kundeopplevelse' : 'Lav kundeopplevelse'
 
   if (!idToken) {
-    return <main className="login-shell"><section className="login-card" aria-labelledby="login-title"><p className="eyebrow">DAGSRAPPORT</p><h1 id="login-title">Dagens tall</h1><p>Logg inn med din Google-konto.</p><button className="google-login-button" type="button" onClick={startGoogleLogin} disabled={!googleReady}>{googleReady ? 'Fortsett med Google' : 'Laster Google-innlogging…'}</button>{authError && <p className="message error" role="alert">{authError}</p>}</section></main>
+    return <main className="login-shell"><section className="login-card" aria-labelledby="login-title"><p className="eyebrow">DAGSRAPPORT</p><h1 id="login-title">Dagens tall</h1><p>Logg inn med din Google-konto.</p><div className="google-login-container" ref={googleButtonRef} aria-label="Logg inn med Google">{!googleReady && 'Laster Google-innlogging…'}</div>{authError && <p className="message error" role="alert">{authError}</p>}</section></main>
   }
 
   const renderStepSummary = (step: Step) => {
