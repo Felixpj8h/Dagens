@@ -9,14 +9,14 @@
 ```env
 GEMINI_API_KEY=din_gemini_nokkel
 GOOGLE_CLIENT_ID=din_google_oauth_client_id
-ALLOWED_EMAIL=din_google_epost
+ALLOWED_EMAILS=din_google_epost
 FRONTEND_ORIGIN=http://localhost:5173
 ENVIRONMENT=development
 ```
 
-5. Kopier `.env.local.example` til `.env.local` i prosjektroten og fyll inn `VITE_GOOGLE_CLIENT_ID`. La `VITE_API_URL` stå tom lokalt, slik at Vite-proxyen brukes.
+4. Kopier `.env.local.example` til `.env.local` i prosjektroten og fyll inn `VITE_GOOGLE_CLIENT_ID`. La `VITE_API_URL` stå tom lokalt, slik at Vite-proxyen brukes.
 
-4. Opprett et privat GitHub-repository. Bekreft at `backend/.env`, `backend/.venv/` og `backend/__pycache__/` ikke er med i Git.
+5. Opprett et privat GitHub-repository. Bekreft at `backend/.env`, `backend/.venv/` og `backend/__pycache__/` ikke er med i Git.
 
 ## Backend: Render Web Service
 
@@ -34,7 +34,7 @@ Legg inn disse hemmelige miljøvariablene i Render:
 ```text
 GEMINI_API_KEY
 GOOGLE_CLIENT_ID
-ALLOWED_EMAIL
+ALLOWED_EMAILS
 FRONTEND_ORIGIN
 ENVIRONMENT=production
 ```
