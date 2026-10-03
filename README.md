@@ -57,6 +57,38 @@ flowchart TB
 5. **Insert sensitive values locally.** The browser replaces tokens such as `[B]`, `[I]`, `[AVVIK]`, `[S1]`, `[SI1]`, and `[SHOUTOUT1_NAVN]` using local form values. Unknown or unresolved tokens remain visible with a warning.
 6. **Review and share.** Edit the draft and copy it to the clipboard. The application does not post to Teams automatically.
 
+## Before and after: local placeholder replacement
+
+This illustrative example uses fictional names and figures. The wording stays the same; the browser fills in the placeholders after receiving the AI template.
+
+### Before: raw AI template
+
+```text
+Sterk innsats i dag! Vi endte med [I] mot et budsjett på [B].
+
+Topp 3:
+1. [S1] med [SI1]
+2. [S2] med [SI2]
+3. [S3] med [SI3]
+
+Ekstra takk til [SHOUTOUT1_NAVN] som hjalp supportlaget i en travel periode.
+```
+
+### After: completed report in the browser
+
+```text
+Sterk innsats i dag! Vi endte med 60 000 kr mot et budsjett på 50 000 kr.
+
+Topp 3:
+1. Alex med 12 000 kr
+2. Robin med 10 000 kr
+3. Kim med 3 500 kr
+
+Ekstra takk til Sam som hjalp supportlaget i en travel periode.
+```
+
+The names and financial figures above are inserted locally and are not sent back to Gemini. The generic shoutout note is part of the AI request; the employee's name is kept in its separate local field. Currency spacing may vary with browser formatting.
+
 ## Privacy and data boundaries
 
 | Information | Handling in the current implementation |
